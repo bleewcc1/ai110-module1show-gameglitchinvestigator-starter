@@ -35,6 +35,7 @@ It wrote the code, ran away, and now the game is unplayable.
   2. Added a regression test, `test_guess_too_high_lexicographic_edge_case`, using `check_guess(80, 9)` — the pair most likely to expose the bug again if the string-comparison fallback were ever reintroduced.
   3. Fixed the existing tests to unpack the `(outcome, message)` tuple instead of comparing it to a bare string.
   4. Added a `pytest.ini` with `pythonpath = .` so `pytest` (not just `python -m pytest`) can find `logic_utils.py` from the project root.
+  5. Moved `parse_guess` into `logic_utils.py` as well (unchanged logic) so its input-parsing behavior — negative numbers, decimals, extremely large values — could be covered directly by pytest (see Challenge 1 below).
 
 ## 📸 Demo Walkthrough
 
@@ -53,16 +54,36 @@ It wrote the code, ran away, and now the game is unplayable.
 platform darwin -- Python 3.11.6, pytest-9.1.1, pluggy-1.6.0
 rootdir: ai110-module1show-gameglitchinvestigator-starter
 configfile: pytest.ini
-collecting ... collected 4 items
+collecting ... collected 7 items
 
-tests/test_game_logic.py::test_winning_guess PASSED                      [ 25%]
-tests/test_game_logic.py::test_guess_too_high PASSED                     [ 50%]
-tests/test_game_logic.py::test_guess_too_low PASSED                      [ 75%]
-tests/test_game_logic.py::test_guess_too_high_lexicographic_edge_case PASSED [100%]
+tests/test_game_logic.py::test_winning_guess PASSED                      [ 14%]
+tests/test_game_logic.py::test_guess_too_high PASSED                     [ 28%]
+tests/test_game_logic.py::test_guess_too_low PASSED                      [ 42%]
+tests/test_game_logic.py::test_guess_too_high_lexicographic_edge_case PASSED [ 57%]
+tests/test_game_logic.py::test_parse_guess_negative_number PASSED        [ 71%]
+tests/test_game_logic.py::test_parse_guess_decimal_input PASSED          [ 85%]
+tests/test_game_logic.py::test_parse_guess_extremely_large_number PASSED [100%]
 
-============================== 4 passed in 0.01s ===============================
+============================== 7 passed in 0.03s ===============================
 ```
+
+### Challenge 1: Advanced Edge-Case Testing
+
+Three edge-case inputs to `parse_guess` were identified and covered:
+
+- **Negative number** (`"-5"`) — outside the valid guess range, but must still parse cleanly to `-5` instead of crashing, so `check_guess` can grade it as "Too Low."
+- **Decimal input** (`"50.7"`) — a user might type a decimal by habit or mistake; `parse_guess` truncates toward zero (`int(float(raw))`) rather than rejecting or rounding it.
+- **Extremely large value** (`"99999999999999999999999999"`) — Python integers are arbitrary precision, so an absurdly large guess should parse without raising `OverflowError`/`ValueError`.
+
+See [ai_interactions.md](ai_interactions.md) for the prompts used to generate these tests.
 
 ## 🚀 Stretch Features
 
-- [ ] [If you choose to complete Challenge 4, describe the Enhanced UI changes here — a screenshot is optional]
+### Challenge 4: Enhanced UI
+
+Four structured, user-friendly output changes were added to `app.py`, without changing `check_guess`, `parse_guess`, or `update_score`'s core logic:
+
+- **Structured metrics row.** The old single `st.info(...)` text banner ("Guess a number between 1 and 100. Attempts left: ...") was replaced with a `st.metric` row for Score / Attempts Left / Range, right after the `st.subheader("Make a guess")` line.
+- **Color-coded, Hot/Cold hints.** In the `if submit:` block, the hint is now `st.error` (red) for "Too High" and `st.info` (blue) for "Too Low", instead of a single `st.warning` for every outcome. Each hint is also paired with a Hot/Cold emoji cue from the new `get_temperature(guess, secret, low, high)` function in `logic_utils.py`, which buckets how close the guess was (as a fraction of the difficulty's range) into `🔥 Scorching hot!` → `♨️ Hot` → `🌤️ Warm` → `❄️ Cold` → `🧊 Freezing`. A win shows `🎯 Bullseye!` instead.
+- **Session summary table.** `st.session_state.history` now stores a structured dict per attempt (`Attempt`, `Guess`, `Result`, `Hint`) instead of a bare guess value, and a `📊 Session Summary` table (`st.table`) renders below the guess form whenever there's at least one attempt. The table is cleared in the `if new_game:` block so it doesn't mix guesses from a previous game.
+- **Verification:** ran the app locally with `streamlit run app.py` and drove it with a headless Playwright browser — confirmed the metrics row, red/blue hint coloring, Hot/Cold emoji cues, and the growing session summary table all render correctly across a losing guess, a winning guess, and a fresh "Too High" guess, with no console errors. The existing pytest suite (7 tests) still passes unchanged, since none of the tested functions' logic was touched.

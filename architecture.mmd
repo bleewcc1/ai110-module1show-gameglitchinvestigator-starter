@@ -1,0 +1,50 @@
+flowchart LR
+    Player(["Player (browser)"])
+
+    subgraph AppPy["app.py — Streamlit UI + session state"]
+        direction TB
+        Sidebar["Sidebar: difficulty selectbox\n(Easy / Normal / Hard)"]
+        Input["Guess form: text_input +\nSubmit / New Game / Show hint"]
+        LocalFns["Local: get_range_for_difficulty()\nupdate_score()"]
+        State[("st.session_state\nsecret, attempts, score,\nstatus, history")]
+        Metrics["Metrics row: Score / Attempts Left / Range\n(st.metric)"]
+        Hint["Color-coded hint\n(st.error / st.info / st.success)"]
+        Summary["📊 Session Summary table\n(st.table of history rows)"]
+
+        Sidebar --> LocalFns --> State
+        Input --> State
+        State --> Metrics
+        State --> Summary
+        State --> Hint
+    end
+
+    subgraph LogicUtils["logic_utils.py — pure game logic (pytest-covered)"]
+        direction TB
+        ParseGuess["parse_guess(raw)\n→ (ok, guess_int, error_message)"]
+        CheckGuess["check_guess(guess, secret)\n→ (outcome, message)"]
+        Temperature["get_temperature(guess, secret, low, high)\n→ Hot/Cold emoji"]
+        Stubs["get_range_for_difficulty()\nupdate_score()\n(NotImplementedError stubs —\nstill duplicated in app.py)"]
+
+        ParseGuess --> CheckGuess --> Temperature
+    end
+
+    subgraph Tests["tests/test_game_logic.py"]
+        direction TB
+        T1["check_guess tests\n(win / too high / too low /\nlexicographic regression)"]
+        T2["parse_guess edge-case tests\n(negative / decimal / huge number)"]
+    end
+
+    PytestIni["pytest.ini\npythonpath = ."]
+
+    Player -- "picks difficulty,\ntypes guess, clicks Submit" --> AppPy
+    AppPy -- "raw_guess, secret" --> LogicUtils
+    LogicUtils -- "outcome, message,\ntemperature" --> AppPy
+    AppPy -- "renders hint,\nmetrics, summary" --> Player
+
+    PytestIni -. "adds project root to\nsys.path for imports" .-> Tests
+    Tests -- "import" --> LogicUtils
+
+    style State fill:#1f6feb,color:#fff
+    style LogicUtils fill:#0d3b24,color:#fff
+    style AppPy fill:#2d2a06,color:#fff
+    style Tests fill:#3b0d0d,color:#fff
