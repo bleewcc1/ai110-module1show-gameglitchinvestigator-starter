@@ -35,6 +35,7 @@ coverage.xml
 # OS generated files
 .DS_Store
 Thumbs.db
+._*
 
 # Editor and IDE settings
 .vscode/

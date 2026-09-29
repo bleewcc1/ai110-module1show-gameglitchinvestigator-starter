@@ -12,13 +12,24 @@ def parse_guess(raw: str):
     raise NotImplementedError("Refactor this function from app.py into logic_utils.py")
 
 
+# FIX: Refactored out of app.py using agent mode. The old version wrapped this
+# comparison in a try/except TypeError with a string-based fallback, which is
+# what let the high/low bug through silently instead of erroring. Since app.py
+# no longer stringifies the secret before calling this, that fallback was dead
+# defensive code and was dropped in favor of a plain numeric comparison.
 def check_guess(guess, secret):
     """
     Compare guess to secret and return (outcome, message).
 
     outcome examples: "Win", "Too High", "Too Low"
     """
-    raise NotImplementedError("Refactor this function from app.py into logic_utils.py")
+    if guess == secret:
+        return "Win", "🎉 Correct!"
+
+    if guess > secret:
+        return "Too High", "📈 Go HIGHER!"
+
+    return "Too Low", "📉 Go LOWER!"
 
 
 def update_score(current_score: int, outcome: str, attempt_number: int):
