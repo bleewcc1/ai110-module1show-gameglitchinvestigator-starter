@@ -4,19 +4,15 @@ Answer each question in 3 to 5 sentences. Be specific and honest about what actu
 
 ## 1. What was broken when you started?
 
-- What did the game look like the first time you ran it?
-- List at least two concrete bugs you noticed at the start  
-  (for example: "the hints were backwards").
+The game itself launched fine and looked normal — Streamlit rendered the title, sidebar, difficulty picker, and guess box without errors. The problems only showed up once I actually played: the "Too High"/"Too Low" hints were unreliable, flipping to the wrong direction on some attempts but not others, which made the game unwinnable by logic alone. Separately, the test suite couldn't even run: `logic_utils.py` only contained `NotImplementedError` stubs, so anything that depended on it (including `tests/test_game_logic.py`, which imports `check_guess` from there) failed immediately instead of giving real pass/fail feedback.
 
 **Bug Reproduction Log**
 
-Document at least 3 bugs you found. Add rows as needed.
-
 | Input | Expected Behavior | Actual Behavior | Console Output / Error |
 |-------|-------------------|-----------------|------------------------|
-| | | | |
-| | | | |
-| | | | |
+| Difficulty: Normal. Attempt #2 (even), guess `80`, secret `9` | "Too High" (📈 Go HIGHER!) | "Too Low" (📉 Go LOWER!) — wrong direction | No error printed; the hint was just silently wrong because `app.py` stringified the secret on even attempts, pushing `check_guess` into a string-comparison fallback |
+| Run `pytest` from a fresh checkout | Tests execute and report pass/fail for `check_guess` | Collection/test failure | `NotImplementedError: Refactor this function from app.py into logic_utils.py`, raised the moment a test called into the stubbed-out `logic_utils.check_guess` |
+| Difficulty: Easy (range 1–20), click "New Game 🔁" | New secret drawn from the Easy range shown in the sidebar (1–20) | New secret drawn from a hardcoded `random.randint(1, 100)` in the "New Game" handler, ignoring the selected difficulty | No error; sidebar still said "Range: 1 to 20" while the real secret could be any number 1–100 (noticed but not part of the fixes applied — see Section 2) |
 
 ---
 
@@ -42,13 +38,14 @@ AI helped design the regression test by picking `80` vs `9` specifically because
 
 ## 4. What did you learn about Streamlit and state?
 
-- How would you explain Streamlit "reruns" and session state to a friend who has never used Streamlit?
+I'd tell a friend that a Streamlit app isn't really a running program with a memory the way they'd expect — every time you click a button, type into a box, or change a dropdown, Streamlit throws away the whole in-memory state and reruns your entire script from top to bottom, like restarting the file. If that were the whole story, every variable would reset to its initial value on every click (the secret number would re-roll itself constantly), which is exactly the kind of "impossible to win" bug this project's setup mentions. `st.session_state` is the escape hatch: it's a dictionary-like object that survives across those reruns for a given browser session, so code like `if "secret" not in st.session_state: st.session_state.secret = random.randint(...)` only picks a new secret the very first time, and every rerun after that just reads the same value back out instead of generating a new one. In this codebase, `secret`, `attempts`, `score`, `status`, and `history` are all stored this way, which is why the score and attempt count kept climbing correctly across guesses instead of resetting to zero every time I clicked "Submit."
 
 ---
 
 ## 5. Looking ahead: your developer habits
 
-- What is one habit or strategy from this project that you want to reuse in future labs or projects?
-  - This could be a testing habit, a prompting strategy, or a way you used Git.
-- What is one thing you would do differently next time you work with AI on a coding task?
-- In one or two sentences, describe how this project changed the way you think about AI generated code.
+The habit I want to keep is writing a regression test around the *specific* input that exposes a bug, rather than just re-testing the happy path — `check_guess(80, 9)` only means something as a test because it's exactly the pair where string comparison and integer comparison disagree, not because it's "another number." I also want to keep the pattern of asking my AI assistant to explain *why* a bug happens before accepting a fix, since that's what let me catch that its first fix left dead defensive code (the `try/except TypeError` fallback) sitting in `check_guess` for a case that could no longer occur.
+
+One thing I'd do differently: I'd run `pytest` myself, in the actual terminal I intended to use day-to-day, earlier in the process. I only discovered the `pytest` vs. `python -m pytest` sys.path difference after I'd already told my AI assistant "tests pass" based on `python -m pytest`, which meant I had to backtrack once bare `pytest` failed with a `ModuleNotFoundError` — that's a step I skipped and shouldn't have.
+
+This project changed how I think about AI-generated code mainly around trust calibration: the AI's explanations of *why* a fix worked were consistently clear and easy to follow, but I only actually believed a fix was correct once I'd seen a concrete before/after comparison (the old buggy logic really producing "Too Low" for 80-vs-9, and the new logic really producing "Too High") — a plausible-sounding explanation and a verified fact turned out to be two different things, and it's on me to check for the second one every time.

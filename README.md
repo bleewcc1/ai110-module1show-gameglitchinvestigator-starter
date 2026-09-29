@@ -25,28 +25,42 @@ It wrote the code, ran away, and now the game is unplayable.
 
 ## 📝 Document Your Experience
 
-- [ ] Describe the game's purpose.
-- [ ] Detail which bugs you found.
-- [ ] Explain what fixes you applied.
+- **Purpose:** A Streamlit number-guessing game. The app picks a secret number in a range set by the chosen difficulty (Easy 1-20, Normal 1-100, Hard 1-50), and the player has a limited number of attempts to guess it, getting a "Too High"/"Too Low" hint after each wrong guess and a score based on how efficiently they win.
+- **Bugs found:**
+  1. **Wrong high/low hints.** On every even-numbered attempt, `app.py` converted the secret to a string (`secret = str(st.session_state.secret)`) before comparing it to the guess. `check_guess` then hit a `try/except TypeError` fallback that compared the two values as strings instead of numbers, so a guess like `80` against a secret of `9` was reported as "Too Low" instead of "Too High" (since `"80" < "9"` lexicographically, even though `80 > 9`).
+  2. **Logic duplicated instead of refactored.** `check_guess`, `parse_guess`, `get_range_for_difficulty`, and `update_score` were fully implemented in `app.py`, while `logic_utils.py` only had `NotImplementedError` stubs — so `tests/test_game_logic.py` (which imports from `logic_utils`) couldn't run at all.
+  3. **Broken test assertions.** The existing tests compared `check_guess`'s return value directly to a bare string (e.g. `assert result == "Win"`), even though the function returns a `(outcome, message)` tuple — so the tests would fail even once `logic_utils` was implemented correctly.
+- **Fixes applied:**
+  1. Removed the even-attempt string conversion in `app.py` and moved `check_guess` into `logic_utils.py` with a plain numeric comparison (no more string fallback).
+  2. Added a regression test, `test_guess_too_high_lexicographic_edge_case`, using `check_guess(80, 9)` — the pair most likely to expose the bug again if the string-comparison fallback were ever reintroduced.
+  3. Fixed the existing tests to unpack the `(outcome, message)` tuple instead of comparing it to a bare string.
+  4. Added a `pytest.ini` with `pythonpath = .` so `pytest` (not just `python -m pytest`) can find `logic_utils.py` from the project root.
 
 ## 📸 Demo Walkthrough
 
-Describe your fixed game in numbered steps so a reader can follow along without watching a video:
-
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+1. Game starts on Normal difficulty (secret number between 1 and 100), 8 attempts allowed.
+2. User enters a guess of `40` and clicks "Submit Guess 🚀" — the game shows "📉 Go LOWER!" ("Too Low"), meaning the secret is below 40.
+3. User enters a guess of `20` — the game shows "📈 Go HIGHER!" ("Too High"), meaning the secret is above 20, narrowing the range to 21–39.
+4. Score updates after each guess: a "Too Low" guess subtracts 5 points, alternating "Too High" guesses add or subtract 5 depending on the attempt number, all visible live in the "Developer Debug Info" expander.
+5. User enters a guess of `30`, which matches the secret — the game shows "🎉 Correct!", displays balloons, reports the final score, and marks the game as "won" so further guesses are blocked until "New Game 🔁" is clicked.
 
 **Screenshot** *(optional)*: <!-- Insert a screenshot of your fixed, winning game here -->
 
 ## 🧪 Test Results
 
 ```
-# Paste your pytest output here, e.g.:
-# pytest tests/
-# ========================= X passed in 0.XXs =========================
+============================= test session starts ==============================
+platform darwin -- Python 3.11.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: ai110-module1show-gameglitchinvestigator-starter
+configfile: pytest.ini
+collecting ... collected 4 items
+
+tests/test_game_logic.py::test_winning_guess PASSED                      [ 25%]
+tests/test_game_logic.py::test_guess_too_high PASSED                     [ 50%]
+tests/test_game_logic.py::test_guess_too_low PASSED                      [ 75%]
+tests/test_game_logic.py::test_guess_too_high_lexicographic_edge_case PASSED [100%]
+
+============================== 4 passed in 0.01s ===============================
 ```
 
 ## 🚀 Stretch Features
